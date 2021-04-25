@@ -28,7 +28,9 @@ if sys.argv[-1] == 'tag':
 readme = open('README.rst').read()
 
 setup(
-    name='django-cloud-tasks-withcredentials',
+    name='django-cloud-tasks
+    
+    ',
     version=version,
     description="""Google Cloud Tasks integration for Django. Forked from https://github.com/GeorgeLubaretsi/django-cloud-tasks""",
     long_description=readme,
