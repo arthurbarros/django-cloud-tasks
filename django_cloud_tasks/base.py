@@ -36,7 +36,8 @@ def _duration_iso_string(duration):
     else:
         sign = ''
 
-    days, hours, minutes, seconds, microseconds = _get_duration_components(duration)
+    days, hours, minutes, seconds, microseconds = _get_duration_components(
+        duration)
     ms = '.{:06d}'.format(microseconds) if microseconds else ""
     return '{}P{}DT{:02d}H{:02d}M{:02d}{}S'.format(sign, days, hours, minutes, seconds, ms)
 
@@ -119,7 +120,8 @@ def batch_execute(tasks, retry_limit=10, retry_interval=3):
                 t.execute_local()
             elif t._is_remote and DCTConfig.block_remote_tasks():
                 logger.debug(
-                    'Remote task {0} was ignored. Task data:\n {1}'.format(t._internal_task_name, t._data)
+                    'Remote task {0} was ignored. Task data:\n {1}'.format(
+                        t._internal_task_name, t._data)
                 )
         return
 
@@ -205,11 +207,12 @@ class CloudTaskRequest(object):
 
 class CloudTaskWrapper(object):
     def __init__(self, base_task, queue, data,
-                 internal_task_name=None, task_handler_url=None, app_engine_routing=None, request_target=None, http_request_domain=None,
+                 internal_task_name=None, task_handler_url=None, delay_seconds=0, app_engine_routing=None, request_target=None, http_request_domain=None,
                  is_remote=False, headers=None):
         self._base_task = base_task
         self._data = data
         self._queue = queue
+        self._delay_seconds = delay_seconds
         self._connection = None
         self._internal_task_name = internal_task_name or self._base_task.internal_task_name
         self._task_handler_url = task_handler_url or DCTConfig.task_handler_root_url()
@@ -225,9 +228,11 @@ class CloudTaskWrapper(object):
     def setup(self):
         self._connection = connection
         if not self._internal_task_name:
-            raise ValueError('Either `internal_task_name` or `base_task` should be provided')
+            raise ValueError(
+                'Either `internal_task_name` or `base_task` should be provided')
         if not self._task_handler_url:
-            raise ValueError('Could not identify task handler URL of the worker service')
+            raise ValueError(
+                'Could not identify task handler URL of the worker service')
 
     def execute_local(self):
         return EmulatedTask(body=self.get_body(), task_key=self._task_key).execute()
@@ -243,7 +248,8 @@ class CloudTaskWrapper(object):
 
         if self._is_remote and DCTConfig.block_remote_tasks():
             logger.debug(
-                'Remote task {0} was ignored. Task data:\n {1}'.format(self._internal_task_name, self._data)
+                'Remote task {0} was ignored. Task data:\n {1}'.format(
+                    self._internal_task_name, self._data)
             )
             return None
 
@@ -281,7 +287,8 @@ class CloudTaskWrapper(object):
 
     def get_body(self):
         url_key = "url" if self._request_target == "http" else "relativeUri"
-        url = self._http_request_domain + self._task_handler_url if self._request_target == "http" else self._task_handler_url
+        url = self._http_request_domain + \
+            self._task_handler_url if self._request_target == "http" else self._task_handler_url
         body = {
             'task': {
                 self._task_key: {
@@ -291,9 +298,12 @@ class CloudTaskWrapper(object):
                 }
             }
         }
+        if self._delay_seconds > 0:
+            body['task']['scheduleTime'] = {
+                "seconds": int(time.time()) + self._delay_seconds
+            }
         if self._app_engine_routing:
             body['task'][self._task_key]["appEngineRouting"] = self._app_engine_routing
-
 
         payload = {
             'internal_task_name': self._internal_task_name,
@@ -301,8 +311,8 @@ class CloudTaskWrapper(object):
         }
         payload = json.dumps(payload, cls=ComplexEncoder)
         logger.debug('Creating task with body {0}'.format(payload),
-                    extra={'taskBody': payload
-                           })
+                     extra={'taskBody': payload
+                            })
         base64_encoded_payload = base64.b64encode(payload.encode())
         converted_payload = base64_encoded_payload.decode()
 
@@ -310,8 +320,10 @@ class CloudTaskWrapper(object):
         return body
 
     def create_cloud_task(self):
-        task = self._connection.tasks_endpoint.create(parent=self._cloud_task_queue_name, body=self.get_body())
+        task = self._connection.tasks_endpoint.create(
+            parent=self._cloud_task_queue_name, body=self.get_body())
         return task
+
 
 class RemoteCloudTask(object):
     def __init__(self, queue, handler, task_handler_url=None, headers=None):
@@ -344,5 +356,6 @@ def remote_task(queue, handler, task_handler_url=None, **headers):
     :param headers: Headers that will be sent to the task handler
     :return: `CloudTaskWrapper` instance
     """
-    task = RemoteCloudTask(queue=queue, handler=handler, task_handler_url=task_handler_url, headers=headers)
+    task = RemoteCloudTask(queue=queue, handler=handler,
+                           task_handler_url=task_handler_url, headers=headers)
     return task
